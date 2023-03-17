@@ -6,7 +6,7 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     public bool CanMove = true;
-    private bool IsSprinting => canSprint && Input.GetKey(sprintKey);
+    private bool IsSprinting => canSprint && Input.GetKey(sprintKey) && characterController.velocity.magnitude > 0;
 
     private bool ShouldCrouch => Input.GetKeyDown(crouchKey) && !duringCrouchAnimaiton && characterController.isGrounded;
 
@@ -50,6 +50,12 @@ public class PlayerController : MonoBehaviour
     private float defaultYPos = 0;
     private float timer;
 
+    [Header("DynamicFOV Parameters")] 
+    [SerializeField] private float walkFOV = 50f;
+    [SerializeField] private float sprintFOV = 60f;
+    [SerializeField] private float crouchFOV = 40f;
+    [SerializeField] private float fovTransitionDuration;
+
     private Camera playerCamera;
     private CharacterController characterController;
 
@@ -61,6 +67,7 @@ public class PlayerController : MonoBehaviour
     {
         playerCamera = GetComponentInChildren<Camera>();
         characterController = GetComponent<CharacterController>();
+        defaultYPos = playerCamera.transform.localPosition.y;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
     }
@@ -72,6 +79,7 @@ public class PlayerController : MonoBehaviour
         {
             HandleMovementInput();
             HandleMouseLook();
+            HandleDynamicFOV();
             
             if(canCrouch) HandleCrouch();
             
@@ -106,7 +114,23 @@ public class PlayerController : MonoBehaviour
 
     private void HandleHeadbob()
     {
-        
+        if (!characterController.isGrounded) return;
+        if (Mathf.Abs(moveDirection.x) > 0.1f || Mathf.Abs(moveDirection.z) > 0.1f)
+        {
+            timer += Time.deltaTime * (isCrouching ? crouchBobSpeed : IsSprinting ? sprintBobSpeed : walkBobSpeed);
+            playerCamera.transform.localPosition =
+                new Vector3(playerCamera.transform.localPosition.x, defaultYPos + Mathf.Sin(timer) * 
+                    (isCrouching ? crouchBobAmount : IsSprinting ? sprintBobAmount : walkBobAmount), playerCamera.transform.localPosition.z);
+            
+        }
+    }
+
+    private void HandleDynamicFOV()
+    {
+        float currentFOV = (isCrouching ? crouchFOV : IsSprinting ? sprintFOV : walkFOV);
+        playerCamera.fieldOfView =
+            Mathf.Lerp(playerCamera.fieldOfView, currentFOV, Time.deltaTime * fovTransitionDuration);
+
     }
 
     private void ApplyFinalMovements()
